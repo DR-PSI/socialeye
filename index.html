@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root{
   --bg:#F3F5F8; --surface:#FFFFFF; --ink:#17202B; --muted:#5B6776; --line:#DCE2EA; --cell0:#E6EAF0;
@@ -64,6 +66,13 @@ input[type=search]{flex:1;min-width:160px}
 .mock{border:1px dashed var(--muted);border-radius:6px;padding:0 6px;font-size:.72rem}
 .empty{color:var(--muted);padding:24px 0;text-align:center}
 .note{font-size:.85rem;color:var(--muted);border-left:3px solid var(--outage);padding-left:10px;margin:12px 0 0}
+/* map */
+#map{height:380px;border-radius:10px;border:1px solid var(--line);background:var(--cell0);z-index:0}
+.leaflet-popup-content{font-family:"IBM Plex Sans Thai",system-ui,sans-serif;font-size:13px;line-height:1.5;margin:10px 12px}
+.leaflet-popup-content img{width:100%;max-height:140px;object-fit:cover;border-radius:6px;margin-bottom:6px}
+.pop-meta{color:#5B6776;font-size:12px}
+.maplegend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.78rem;color:var(--muted);margin-top:8px}
+.maplegend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
 /* photos */
 .gallery{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory}
 .ph{flex:0 0 150px;scroll-snap-align:start;margin:0;cursor:pointer;background:none;border:0;padding:0;text-align:left;color:inherit;font:inherit}
@@ -89,6 +98,13 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
     <p class="hint">สีเข้ม = มีโพสต์ไฟดับหรืออุปกรณ์อันตรายมาก กดช่องเพื่อดูเฉพาะชั่วโมงนั้น</p>
     <div class="grid-scroll"><div class="pulse" id="pulse"></div></div>
     <div class="legend">น้อย <i style="background:var(--cell0)"></i><i data-l="1"></i><i data-l="2"></i><i data-l="3"></i> มาก</div>
+  </section>
+
+  <section aria-labelledby="mapTitle">
+    <h2 id="mapTitle">แผนที่จุดแจ้งเหตุ</h2>
+    <p class="hint">หมุดแสดงตำแหน่งตามตัวกรองด้านล่าง กดหมุดเพื่อดูรายละเอียด หมุดขอบประคือข้อมูลตัวอย่าง (ตำแหน่งโดยประมาณ)</p>
+    <div id="map" role="region" aria-label="แผนที่เขตลาดกระบัง"></div>
+    <div class="maplegend" id="mapLegend"></div>
   </section>
 
   <section aria-labelledby="galTitle" id="galSec" hidden>
@@ -219,7 +235,48 @@ function renderGallery(){
     $("dlgImg").src=m.photo; $("dlgText").textContent=m.text; $("dlg").showModal();});
 }
 $("dlg").onclick=()=>$("dlg").close();
-function render(){ renderPulse(); renderChips(); renderGallery(); renderFeed(); }
+// ===== แผนที่ =====
+const AREA_LL={"ลาดกระบัง":[13.7270,100.7520],"หัวตะเข้":[13.7275,100.7710],"เคหะร่มเกล้า":[13.7560,100.7290],"ร่มเกล้า":[13.7480,100.7300],
+  "ลำปลาทิว":[13.7850,100.8000],"คลองสองต้นนุ่น":[13.7700,100.7400],"คลองสามประเวศ":[13.7350,100.8000],"ทับยาว":[13.7380,100.8200],
+  "ขุมทอง":[13.8050,100.8150],"สุวรรณภูมิ":[13.6950,100.7500],"ฉลองกรุง":[13.7550,100.7800],"อ่อนนุช":[13.7100,100.7200],
+  "สจล":[13.7299,100.7783],"นิคมลาดกระบัง":[13.7130,100.7740]};
+let map=null, layer=null;
+const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function initMap(){
+  if(!window.L||map) return;
+  map=L.map("map",{scrollWheelZoom:false}).setView([13.745,100.765],12);
+  const dark=matchMedia("(prefers-color-scheme: dark)").matches;
+  L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark?"dark_all":"light_all"}/{z}/{x}/{y}{r}.png`,{maxZoom:19,subdomains:"abcd",
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'}).addTo(map);
+  layer=L.layerGroup().addTo(map);
+  $("mapLegend").innerHTML=Object.entries(CAT).map(([k,v])=>`<span><i style="background:${v.color}"></i>${v.label}</span>`).join("");
+}
+function posOf(m,i){
+  if(typeof m.lat==="number"&&typeof m.lng==="number") return [m.lat,m.lng];
+  const b=AREA_LL[m.area]; if(!b) return null;
+  const j=((i*9301+49297)%233280)/233280, k=((i*49297+9301)%233280)/233280; // กระจายหมุดตัวอย่างไม่ให้ทับกัน
+  return [b[0]+(j-.5)*.008,b[1]+(k-.5)*.008];
+}
+function renderMap(){
+  initMap(); if(!layer) return;
+  layer.clearLayers();
+  const pts=[];
+  filtered(false).forEach((m,i)=>{
+    const p=posOf(m,i); if(!p) return; pts.push(p);
+    const col=cssVar("--"+(CAT[m.category]?m.category:"general"));
+    const mk=L.circleMarker(p,{radius:m.mock?6:8,color:m.mock?col:"#fff",weight:m.mock?2:2,dashArray:m.mock?"3 3":null,
+      fillColor:col,fillOpacity:m.mock?.35:.9});
+    const c=CAT[m.category]||CAT.general;
+    mk.bindPopup(`${m.photo?`<img src="${esc(m.photo)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">`:""}
+      <div><b style="color:${col}">${c.label}</b>${m.mock?" · ตัวอย่าง":""}</div><div>${esc((m.text||"").slice(0,160))}</div>
+      <div class="pop-meta">${esc(m.area||"")} · ${PLAT[m.platform]||esc(m.platform)} · ${ago(m.publishedAt)}${m.state?" · "+esc(m.state):""}</div>
+      ${m.url?`<a href="${esc(m.url)}" target="_blank" rel="noopener">เปิดต้นทาง</a>`:""}`,{maxWidth:260});
+    mk.addTo(layer);
+  });
+  if(pts.length&&state.area) map.fitBounds(pts,{padding:[30,30],maxZoom:15});
+}
+
+function render(){ renderPulse(); renderChips(); renderMap(); renderGallery(); renderFeed(); }
 $("src").onchange=e=>{state.src=e.target.value;render();};
 $("area").onchange=e=>{state.area=e.target.value;render();};
 $("q").oninput=e=>{state.q=e.target.value;render();};
@@ -276,6 +333,8 @@ async function traffyLive(){
       const clean=desc.replace(/^ปัญหา:\s*/,"").replace(/\s*#1555\s*$/,"");
       return {id:"traffy_"+t.ticket_id,platform:"traffy",kind:"report",text:(types?`[${types}] `:"")+clean,
         category:/ไฟดับ|ไฟฟ้าดับ|ไฟตก/.test(types+desc)?"outage":"hazard",area:"ลาดกระบัง",photo:ph,state:t.state||"",
+        lat:(()=>{const c=t.coords||[];const a=+c[0],b=+c[1];return isNaN(a)?null:(a>90?b:a)})(),
+        lng:(()=>{const c=t.coords||[];const a=+c[0],b=+c[1];return isNaN(a)?null:(a>90?a:b)})(),
         publishedAt:new Date(t.timestamp||t.last_activity).toISOString(),url:t.ticket_id?`https://share.traffy.in.th/teamchadchart/${t.ticket_id}`:""};
     });
   }catch(e){ return []; }
