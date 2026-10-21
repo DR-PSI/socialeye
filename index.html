@@ -83,8 +83,16 @@ input[type=search]{flex:1;min-width:160px}
 .ph span{display:block;font-size:.75rem;color:var(--muted);margin-top:4px;line-height:1.4}
 .thumb{width:96px;height:72px;object-fit:cover;border-radius:8px;float:right;margin:0 0 6px 10px;background:var(--cell0)}
 dialog{border:0;border-radius:14px;padding:0;max-width:min(92vw,720px);background:var(--surface);color:var(--ink)}
-dialog img{width:100%;display:block}
-dialog p{margin:0;padding:12px 14px;font-size:.9rem}
+dialog{width:min(92vw,560px)}
+dialog img{width:100%;max-height:50vh;object-fit:contain;background:#000;display:block}
+.dhead{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+.dclose{font:inherit;border:0;background:transparent;color:var(--ink);font-size:1.1rem;cursor:pointer;padding:4px 8px}
+.dbody{padding:12px 14px}
+dialog p{margin:0 0 8px;font-size:.95rem;overflow-wrap:anywhere;white-space:pre-line}
+#dMap{height:200px}
+.item{cursor:pointer}
+.item:hover .text{text-decoration:underline;text-decoration-color:var(--line)}
+.popbtn{font:inherit;font-size:12px;margin-top:6px;border:1px solid #DCE2EA;background:#fff;border-radius:6px;padding:3px 8px;cursor:pointer}
 dialog::backdrop{background:rgba(0,0,0,.6)}
 @media (prefers-reduced-motion:no-preference){ .cell{transition:background-color .3s} }
 </style>
@@ -135,7 +143,12 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
     <p class="note" id="tiktokNote" hidden>TikTok ยังไม่มี API ฟรีสำหรับงานเชิงพาณิชย์ จะเชื่อมผ่าน Mandala AI ในเฟสถัดไป</p>
   </section>
 </div>
-<dialog id="dlg"><img id="dlgImg" alt=""><p id="dlgText"></p></dialog>
+<dialog id="dlg" aria-labelledby="dTitle">
+  <div class="dhead"><b id="dTitle"></b><button class="dclose" id="dClose" aria-label="ปิด">✕</button></div>
+  <img id="dlgImg" alt="" referrerpolicy="no-referrer" hidden>
+  <div class="dbody"><p id="dlgText"></p><div class="meta" id="dMeta"></div></div>
+  <div id="dMap"></div>
+</dialog>
 
 <script type="module">
 // ===== ตั้งค่า: วาง Firebase config ตรงนี้เพื่อเปลี่ยนจากข้อมูลจำลองเป็นข้อมูลจริง =====
@@ -228,24 +241,46 @@ function renderFeed(){
   if(!list.length){ $("feed").innerHTML=`<li class="empty">${state.items.length?"ไม่พบโพสต์ตามตัวกรองนี้ ลองล้างตัวกรองหรือเลือกช่วงเวลาอื่น":"ยังไม่มีข้อมูล รอ n8n ดึงรอบแรก"}</li>`; return; }
   $("feed").innerHTML=list.slice(0,200).map(m=>{
     const c=CAT[m.category]||CAT.general;
-    return `<li class="item"><span class="bar" style="background:${c.color}"></span><div>
+    return `<li class="item" tabindex="0" data-id="${esc(m.id)}"><span class="bar" style="background:${c.color}"></span><div>
       ${m.photo?`<img class="thumb" src="${esc(m.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:""}
       <p class="text">${esc(m.text)}</p>
       <div class="meta"><span class="tag" style="color:${c.color}">${c.label}</span>
       <span>${esc(m.area||"-")}</span><span>${PLAT[m.platform]||esc(m.platform)} ${m.kind==="comment"?"คอมเมนต์":m.kind==="report"?"แจ้งเรื่อง":"โพสต์"}</span>
-      <span>${ago(m.publishedAt)}</span>${m.mock?`<span class="mock">ตัวอย่าง</span>`:""}${m.state?`<span>${esc(m.state)}</span>`:""}${m.url?`<a href="${esc(m.url)}" target="_blank" rel="noopener">เปิดต้นทาง</a>`:""}</div>
+      <span>${ago(m.publishedAt)}</span>${m.mock?`<span class="mock">ตัวอย่าง</span>`:""}${m.state?`<span>${esc(m.state)}</span>`:""}</div>
     </div></li>`;
   }).join("");
+  $("feed").querySelectorAll(".item").forEach(li=>{
+    li.onclick=()=>openDetail(li.dataset.id);
+    li.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openDetail(li.dataset.id); } };
+  });
+}
+
+let dMap=null, dMark=null;
+function openDetail(id){
+  const m=state.items.find(x=>x.id===id); if(!m) return;
+  const c=CAT[m.category]||CAT.general;
+  $("dTitle").textContent=c.label+(m.mock?" · ตัวอย่าง":""); $("dTitle").style.color=c.color;
+  const img=$("dlgImg"); img.hidden=!m.photo; if(m.photo){ img.src=m.photo; img.onerror=()=>img.hidden=true; } else img.removeAttribute("src");
+  $("dlgText").textContent=m.text||"";
+  $("dMeta").innerHTML=[esc(m.area||"-"),PLAT[m.platform]||esc(m.platform),new Date(m.publishedAt).toLocaleString("th-TH",{dateStyle:"medium",timeStyle:"short"})+" น.",m.state?esc(m.state):""].filter(Boolean).map(s=>`<span>${s}</span>`).join("");
+  $("dlg").showModal();
+  const p=posOf(m,state.items.indexOf(m));
+  $("dMap").hidden=!p||!window.L;
+  if(p&&window.L){
+    if(!dMap){ dMap=L.map("dMap",{zoomControl:false,attributionControl:false}); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(dMap); }
+    dMap.setView(p,16); setTimeout(()=>dMap.invalidateSize(),50);
+    if(dMark) dMark.remove(); dMark=L.circleMarker(p,{radius:9,color:"#fff",weight:2,fillColor:cssVar("--"+(CAT[m.category]?m.category:"general")),fillOpacity:.95}).addTo(dMap);
+  }
 }
 
 function renderGallery(){
   const pics=filtered(false).filter(m=>m.photo).sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt)).slice(0,20);
   $("galSec").hidden=!pics.length;
   $("gallery").innerHTML=pics.map((m,i)=>`<button class="ph" data-i="${i}"><img src="${esc(m.photo)}" alt="${esc((m.text||"").slice(0,60))}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.remove()"><span>${esc(m.area||"")} ${ago(m.publishedAt)}</span></button>`).join("");
-  $("gallery").querySelectorAll(".ph").forEach(b=>b.onclick=()=>{const m=pics[+b.dataset.i];
-    $("dlgImg").src=m.photo; $("dlgText").textContent=m.text; $("dlg").showModal();});
+  $("gallery").querySelectorAll(".ph").forEach(b=>b.onclick=()=>openDetail(pics[+b.dataset.i].id));
 }
-$("dlg").onclick=()=>$("dlg").close();
+$("dClose").onclick=()=>$("dlg").close();
+$("dlg").onclick=e=>{ if(e.target===$("dlg")) $("dlg").close(); };
 // ===== แผนที่ =====
 const AREA_LL={"ลาดกระบัง":[13.7270,100.7520],"หัวตะเข้":[13.7275,100.7710],"เคหะร่มเกล้า":[13.7560,100.7290],"ร่มเกล้า":[13.7480,100.7300],
   "ลำปลาทิว":[13.7850,100.8000],"คลองสองต้นนุ่น":[13.7700,100.7400],"คลองสามประเวศ":[13.7350,100.8000],"ทับยาว":[13.7380,100.8200],
@@ -280,7 +315,8 @@ function renderMap(){
     mk.bindPopup(`${m.photo?`<img src="${esc(m.photo)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">`:""}
       <div><b style="color:${col}">${c.label}</b>${m.mock?" · ตัวอย่าง":""}</div><div>${esc((m.text||"").slice(0,160))}</div>
       <div class="pop-meta">${esc(m.area||"")} · ${PLAT[m.platform]||esc(m.platform)} · ${ago(m.publishedAt)}${m.state?" · "+esc(m.state):""}</div>
-      ${m.url?`<a href="${esc(m.url)}" target="_blank" rel="noopener">เปิดต้นทาง</a>`:""}`,{maxWidth:260});
+      <button class="popbtn" data-id="${esc(m.id)}">ดูรายละเอียด</button>`,{maxWidth:260});
+    mk.on("popupopen",e=>{ const b=e.popup.getElement().querySelector(".popbtn"); if(b) b.onclick=()=>{ map.closePopup(); openDetail(m.id); }; });
     mk.addTo(layer);
   });
   if(pts.length&&state.area) map.fitBounds(pts,{padding:[30,30],maxZoom:15});
@@ -366,7 +402,10 @@ async function start(){
     const apply=()=>{ state.items=$("mockToggle").checked?live.concat(MOCK):live; renderAreas(); render(); };
     $("mockWrap").hidden=false; $("mockToggle").onchange=apply;
     fs.onSnapshot(q,snap=>{
-      live=snap.docs.map(d=>({id:d.id,...d.data()}));
+      const toISO=v=>{ if(!v) return new Date().toISOString(); if(typeof v.toDate==="function") return v.toDate().toISOString();
+        if(typeof v.seconds==="number") return new Date(v.seconds*1000).toISOString(); const d=new Date(v); return isNaN(d)?new Date().toISOString():d.toISOString(); };
+      live=snap.docs.map(d=>{const x={id:d.id,...d.data()}; x.publishedAt=toISO(x.publishedAt);
+        if(typeof x.lat==="string") x.lat=parseFloat(x.lat); if(typeof x.lng==="string") x.lng=parseFloat(x.lng); return x;});
       apply();
       setStatus(true,`ข้อมูลจริง ${live.length} รายการ · อัปเดต ${new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})} น.`);
     },err=>{ setStatus(false,"เชื่อม Firestore ไม่ได้: "+err.code+" ตรวจ Security Rules ให้อ่าน "+COLLECTION+" ได้"); });
