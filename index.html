@@ -61,6 +61,7 @@ input[type=search]{flex:1;min-width:160px}
 .meta{font-size:.8rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px}
 .meta a{color:var(--service)}
 .tag{font-weight:600}
+.mock{border:1px dashed var(--muted);border-radius:6px;padding:0 6px;font-size:.72rem}
 .empty{color:var(--muted);padding:24px 0;text-align:center}
 .note{font-size:.85rem;color:var(--muted);border-left:3px solid var(--outage);padding-left:10px;margin:12px 0 0}
 /* photos */
@@ -204,8 +205,8 @@ function renderFeed(){
       ${m.photo?`<img class="thumb" src="${esc(m.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:""}
       <p class="text">${esc(m.text)}</p>
       <div class="meta"><span class="tag" style="color:${c.color}">${c.label}</span>
-      <span>${esc(m.area||"-")}</span><span>${PLAT[m.platform]||esc(m.platform)} ${m.kind==="comment"?"คอมเมนต์":"โพสต์"}</span>
-      <span>${ago(m.publishedAt)}</span>${m.state?`<span>${esc(m.state)}</span>`:""}${m.url?`<a href="${esc(m.url)}" target="_blank" rel="noopener">เปิดต้นทาง</a>`:""}</div>
+      <span>${esc(m.area||"-")}</span><span>${PLAT[m.platform]||esc(m.platform)} ${m.kind==="comment"?"คอมเมนต์":m.kind==="report"?"แจ้งเรื่อง":"โพสต์"}</span>
+      <span>${ago(m.publishedAt)}</span>${m.mock?`<span class="mock">ตัวอย่าง</span>`:""}${m.state?`<span>${esc(m.state)}</span>`:""}${m.url?`<a href="${esc(m.url)}" target="_blank" rel="noopener">เปิดต้นทาง</a>`:""}</div>
     </div></li>`;
   }).join("");
 }
@@ -249,7 +250,7 @@ function mock(){
   for(let r=0;r<3;r++) S.forEach((s,i)=>{
     const hrs=((i*13+r*41)%160)+(r===0&&i<3?-i*0.5:0)+0.3;
     out.push({id:`m${r}_${i}`,text:s[0],category:s[1],area:s[2],platform:s[3],kind:s[4],
-      publishedAt:new Date(now-hrs*3600e3).toISOString(),url:""});
+      publishedAt:new Date(now-hrs*3600e3).toISOString(),url:"",mock:true});
   });
   return out;
 }
@@ -261,13 +262,17 @@ async function traffyLive(){
     const r=await fetch(`https://publicapi.traffy.in.th/share/teamchadchart/search?limit=1000&last_activity_start=${d}`,{signal:ctl.signal});
     const j=await r.json();
     return (j.results||j.data||[]).filter(t=>{
-      const types=[].concat(t.problem_type_abdul||[],t.type||[]).join(" "), desc=String(t.description||"");
-      return /ลาดกระบัง/.test(String(t.district||"")+(t.address||"")) && /สายไฟ|เสาไฟ|หม้อแปลง|ลัดวงจร|ไฟฟ้าดับ|ไฟดับ/.test(types+" "+desc);
+      const types=[].concat(t.problem_type_abdul||[],t.type||[],t.problem_type||[]).join(" ").replace(/[{}",]/g," ").trim(), desc=String(t.description||"");
+      const STRONG=/ไฟดับ|ไฟฟ้าดับ|ไฟตก|หม้อแปลง|ลัดวงจร|สายไฟ(ขาด|ห้อย|หย่อน|พาด|ช็อต)|ไฟช็อต|ประกายไฟ|เสาไฟฟ้า(ล้ม|เอียง|หัก)/;
+      const ROAD=/ถนน.{0,20}(ชำรุด|หลุม|ทรุด)|หลุมบ่อ|ยางมะตอย|ผิวจราจร|ทางเท้า|ฟุตบาท|ท่อระบายน้ำ|น้ำท่วม|ขยะ/;
+      if(ROAD.test(desc)&&!STRONG.test(desc)&&!/สายไฟ/.test(types)) return false;
+      return /ลาดกระบัง/.test(String(t.district||"")+(t.address||"")) && (/สายไฟ|ไฟฟ้า/.test(types)||STRONG.test(desc));
     }).map(t=>{
-      const types=[].concat(t.problem_type_abdul||[],t.type||[]).join(" "), desc=String(t.description||"");
+      const types=[].concat(t.problem_type_abdul||[],t.type||[],t.problem_type||[]).join(" ").replace(/[{}",]/g," ").trim(), desc=String(t.description||"");
       const ph=/^ปัญหา:|1555/.test(desc)?"":String(t.photo_url||"").replace(/^http:/,"https:");
-      return {id:"traffy_"+t.ticket_id,platform:"traffy",kind:"report",text:(types?`[${types}] `:"")+desc,
-        category:/ไฟดับ|ไฟฟ้าดับ/.test(types+desc)?"outage":"hazard",area:"ลาดกระบัง",photo:ph,state:t.state||"",
+      const clean=desc.replace(/^ปัญหา:\s*/,"").replace(/\s*#1555\s*$/,"");
+      return {id:"traffy_"+t.ticket_id,platform:"traffy",kind:"report",text:(types?`[${types}] `:"")+clean,
+        category:/ไฟดับ|ไฟฟ้าดับ|ไฟตก/.test(types+desc)?"outage":"hazard",area:"ลาดกระบัง",photo:ph,state:t.state||"",
         publishedAt:new Date(t.timestamp||t.last_activity).toISOString(),url:t.ticket_id?`https://share.traffy.in.th/teamchadchart/${t.ticket_id}`:""};
     });
   }catch(e){ return []; }
