@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SocialEye ลาดกระบัง</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --ink:#17202B; --muted:#5B6776; --line:#DCE2EA; --cell0:#E6EAF0;
+  --outage:#E36A0C; --hazard:#C2362B; --service:#2563A6; --praise:#2F8F5B; --general:#8A94A3;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#0F151D; --surface:#17202B; --ink:#E7ECF2; --muted:#9AA6B5; --line:#283342; --cell0:#1F2935;
+    --outage:#F08A33; --hazard:#E5574B; --service:#5B92D6; --praise:#4FB37C; --general:#7D8897; color-scheme:dark; }
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;font-size:15px;line-height:1.6;
+  padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px;margin-bottom:20px}
+h1{font-size:1.6rem;font-weight:700;margin:0;letter-spacing:-.01em}
+h1 small{display:block;font-size:.85rem;font-weight:400;color:var(--muted);letter-spacing:0}
+.status{font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--general)}
+.dot.live{background:var(--praise);box-shadow:0 0 0 4px color-mix(in srgb,var(--praise) 25%,transparent)}
+section{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+h2{font-size:1rem;font-weight:600;margin:0 0 4px}
+.hint{font-size:.85rem;color:var(--muted);margin:0 0 12px}
+/* pulse grid */
+.grid-scroll{overflow-x:auto}
+.pulse{display:grid;grid-template-columns:52px repeat(24,minmax(11px,1fr));gap:3px;min-width:340px}
+.pulse .lbl{font-size:.75rem;color:var(--muted);align-self:center;white-space:nowrap}
+.pulse .hr{font-size:.65rem;color:var(--muted);text-align:center}
+.cell{aspect-ratio:1;border-radius:3px;border:0;padding:0;cursor:pointer;background:var(--cell0)}
+.cell.sel{outline:2px solid var(--ink);outline-offset:1px}
+.cell:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--service);outline-offset:2px}
+.legend{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);margin-top:10px}
+.legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+/* filters */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.chip{font:inherit;font-size:.9rem;border:1px solid var(--line);background:transparent;color:var(--ink);
+  border-radius:999px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.chip b{font-weight:700}
+.chip .sw{width:10px;height:10px;border-radius:50%}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+select,input[type=search]{font:inherit;font-size:.9rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+input[type=search]{flex:1;min-width:160px}
+/* feed */
+.feed{list-style:none;margin:0;padding:0}
+.item{display:grid;grid-template-columns:4px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.bar{border-radius:2px}
+.text{margin:0 0 4px;overflow-wrap:anywhere}
+.meta{font-size:.8rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px}
+.meta a{color:var(--service)}
+.tag{font-weight:600}
+.mock{border:1px dashed var(--muted);border-radius:6px;padding:0 6px;font-size:.72rem}
+.empty{color:var(--muted);padding:24px 0;text-align:center}
+.note{font-size:.85rem;color:var(--muted);border-left:3px solid var(--outage);padding-left:10px;margin:12px 0 0}
+/* photos */
+.gallery{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory}
+.ph{flex:0 0 150px;scroll-snap-align:start;margin:0;cursor:pointer;background:none;border:0;padding:0;text-align:left;color:inherit;font:inherit}
+.ph img{width:150px;height:110px;object-fit:cover;border-radius:10px;display:block;background:var(--cell0)}
+.ph span{display:block;font-size:.75rem;color:var(--muted);margin-top:4px;line-height:1.4}
+.thumb{width:96px;height:72px;object-fit:cover;border-radius:8px;float:right;margin:0 0 6px 10px;background:var(--cell0)}
+dialog{border:0;border-radius:14px;padding:0;max-width:min(92vw,720px);background:var(--surface);color:var(--ink)}
+dialog img{width:100%;display:block}
+dialog p{margin:0;padding:12px 14px;font-size:.9rem}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+@media (prefers-reduced-motion:no-preference){ .cell{transition:background-color .3s} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>SocialEye ลาดกระบัง<small>เสียงประชาชนเรื่องไฟฟ้าในเขตลาดกระบัง จากโซเชียลมีเดีย</small></h1>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">กำลังโหลด…</span></div>
+  </header>
+
+  <section aria-labelledby="pulseTitle">
+    <h2 id="pulseTitle">เรื่องร้องเรียน 7 วันล่าสุด รายชั่วโมง</h2>
+    <p class="hint">สีเข้ม = มีโพสต์ไฟดับหรืออุปกรณ์อันตรายมาก กดช่องเพื่อดูเฉพาะชั่วโมงนั้น</p>
+    <div class="grid-scroll"><div class="pulse" id="pulse"></div></div>
+    <div class="legend">น้อย <i style="background:var(--cell0)"></i><i data-l="1"></i><i data-l="2"></i><i data-l="3"></i> มาก</div>
+  </section>
+
+  <section aria-labelledby="galTitle" id="galSec" hidden>
+    <h2 id="galTitle">ภาพจากพื้นที่</h2>
+    <p class="hint">รูปที่ประชาชนแนบมากับการแจ้งเหตุใน Traffy Fondue และ Longdo กดเพื่อดูภาพใหญ่</p>
+    <div class="gallery" id="gallery"></div>
+  </section>
+
+  <section aria-labelledby="feedTitle">
+    <h2 id="feedTitle">โพสต์และคอมเมนต์</h2>
+    <div class="chips" id="chips"></div>
+    <div class="row" style="margin-bottom:8px">
+      <select id="src" aria-label="แหล่งข้อมูล">
+        <option value="all">ทุกแพลตฟอร์ม</option>
+        <option value="facebook">Facebook</option>
+        <option value="traffy">Traffy Fondue</option>
+        <option value="longdo">Longdo</option>
+        <option value="tiktok">TikTok</option>
+      </select>
+      <select id="area" aria-label="พื้นที่"><option value="">ทุกพื้นที่</option></select>
+      <input type="search" id="q" placeholder="ค้นหาข้อความ เช่น หม้อแปลง">
+    </div>
+    <ul class="feed" id="feed"></ul>
+    <p class="note" id="tiktokNote" hidden>TikTok ยังไม่มี API ฟรีสำหรับงานเชิงพาณิชย์ จะเชื่อมผ่าน Mandala AI ในเฟสถัดไป</p>
+  </section>
+</div>
+<dialog id="dlg"><img id="dlgImg" alt=""><p id="dlgText"></p></dialog>
+
+<script type="module">
+// ===== ตั้งค่า: วาง Firebase config ตรงนี้เพื่อเปลี่ยนจากข้อมูลจำลองเป็นข้อมูลจริง =====
+const FIREBASE_CONFIG = null; // ตัวอย่าง: { apiKey:"...", authDomain:"...", projectId:"..." }
+const COLLECTION = "social_mentions";
+
+const CAT = {
+  outage:{label:"ไฟดับ/ไฟตก",color:"var(--outage)"},
+  hazard:{label:"อุปกรณ์อันตราย",color:"var(--hazard)"},
+  service:{label:"บริการ/ค่าไฟ",color:"var(--service)"},
+  praise:{label:"ชื่นชม",color:"var(--praise)"},
+  general:{label:"ทั่วไป",color:"var(--general)"}
+};
+const PLAT = {youtube:"YouTube",facebook:"Facebook",tiktok:"TikTok",traffy:"Traffy Fondue",longdo:"Longdo"};
+const state = {items:[],cat:null,src:"all",area:"",q:"",cell:null};
+const $ = id => document.getElementById(id);
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const dayKey = d => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+document.querySelectorAll(".legend i[data-l]").forEach(i=>i.style.background=heat(+i.dataset.l));
+function heat(n){ if(!n) return "var(--cell0)"; const p=[0,35,65,100][Math.min(n,3)]; return `color-mix(in srgb, var(--outage) ${p}%, var(--cell0))`; }
+
+function ago(iso){
+  const m=Math.round((Date.now()-new Date(iso))/60000);
+  if(m<60) return `${Math.max(m,1)} นาทีที่แล้ว`;
+  const h=Math.round(m/60); if(h<24) return `${h} ชม.ที่แล้ว`;
+  return `${Math.round(h/24)} วันที่แล้ว`;
+}
+
+function filtered(ignoreCat){
+  const q=state.q.trim();
+  return state.items.filter(m=>
+    (ignoreCat||!state.cat||m.category===state.cat) &&
+    (state.src==="all"||m.platform===state.src) &&
+    (!state.area||m.area===state.area) &&
+    (!q||(m.text||"").includes(q)) &&
+    (!state.cell||(()=>{const d=new Date(m.publishedAt);return dayKey(d)===state.cell.day&&d.getHours()===state.cell.h})())
+  );
+}
+
+function renderPulse(){
+  const el=$("pulse"); el.innerHTML="";
+  el.insertAdjacentHTML("beforeend",`<span></span>`+Array.from({length:24},(_,h)=>`<span class="hr">${h%6===0?h:""}</span>`).join(""));
+  const counts={};
+  state.items.forEach(m=>{ if(m.category!=="outage"&&m.category!=="hazard")return;
+    const d=new Date(m.publishedAt); const k=dayKey(d)+"|"+d.getHours(); counts[k]=(counts[k]||0)+1; });
+  const days=["อา.","จ.","อ.","พ.","พฤ.","ศ.","ส."];
+  for(let i=6;i>=0;i--){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    const dk=dayKey(d);
+    el.insertAdjacentHTML("beforeend",`<span class="lbl">${i===0?"วันนี้":days[d.getDay()]+" "+d.getDate()}</span>`);
+    for(let h=0;h<24;h++){
+      const n=counts[dk+"|"+h]||0;
+      const b=document.createElement("button");
+      b.className="cell"+(state.cell&&state.cell.day===dk&&state.cell.h===h?" sel":"");
+      b.style.background=heat(n);
+      b.setAttribute("aria-label",`${d.getDate()}/${d.getMonth()+1} ${h}:00 น. ร้องเรียน ${n} รายการ`);
+      b.title=`${h}:00 น. — ${n} รายการ`;
+      b.onclick=()=>{ state.cell=(state.cell&&state.cell.day===dk&&state.cell.h===h)?null:{day:dk,h}; render(); };
+      el.appendChild(b);
+    }
+  }
+}
+
+function renderChips(){
+  const base=filtered(true);
+  $("chips").innerHTML=Object.entries(CAT).map(([k,v])=>{
+    const n=base.filter(m=>m.category===k).length;
+    return `<button class="chip" data-k="${k}" aria-pressed="${state.cat===k}"><span class="sw" style="background:${v.color}"></span>${v.label} <b>${n}</b></button>`;
+  }).join("");
+  $("chips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{state.cat=state.cat===b.dataset.k?null:b.dataset.k;render();});
+}
+
+function renderAreas(){
+  const sel=$("area"); const cur=state.area;
+  const areas=[...new Set(state.items.map(m=>m.area).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"th"));
+  sel.innerHTML=`<option value="">ทุกพื้นที่</option>`+areas.map(a=>`<option ${a===cur?"selected":""}>${esc(a)}</option>`).join("");
+}
+
+function renderFeed(){
+  const list=filtered(false).sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt));
+  $("tiktokNote").hidden=state.src!=="tiktok";
+  if(!list.length){ $("feed").innerHTML=`<li class="empty">${state.items.length?"ไม่พบโพสต์ตามตัวกรองนี้ ลองล้างตัวกรองหรือเลือกช่วงเวลาอื่น":"ยังไม่มีข้อมูล รอ n8n ดึงรอบแรก"}</li>`; return; }
+  $("feed").innerHTML=list.slice(0,200).map(m=>{
+    const c=CAT[m.category]||CAT.general;
+    return `<li class="item"><span class="bar" style="background:${c.color}"></span><div>
+      ${m.photo?`<img class="thumb" src="${esc(m.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:""}
+      <p class="text">${esc(m.text)}</p>
+      <div class="meta"><span class="tag" style="color:${c.color}">${c.label}</span>
+      <span>${esc(m.area||"-")}</span><span>${PLAT[m.platform]||esc(m.platform)} ${m.kind==="comment"?"คอมเมนต์":m.kind==="report"?"แจ้งเรื่อง":"โพสต์"}</span>
+      <span>${ago(m.publishedAt)}</span>${m.mock?`<span class="mock">ตัวอย่าง</span>`:""}${m.state?`<span>${esc(m.state)}</span>`:""}${m.url?`<a href="${esc(m.url)}" target="_blank" rel="noopener">เปิดต้นทาง</a>`:""}</div>
+    </div></li>`;
+  }).join("");
+}
+
+function renderGallery(){
+  const pics=filtered(false).filter(m=>m.photo).sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt)).slice(0,20);
+  $("galSec").hidden=!pics.length;
+  $("gallery").innerHTML=pics.map((m,i)=>`<button class="ph" data-i="${i}"><img src="${esc(m.photo)}" alt="${esc((m.text||"").slice(0,60))}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.remove()"><span>${esc(m.area||"")} ${ago(m.publishedAt)}</span></button>`).join("");
+  $("gallery").querySelectorAll(".ph").forEach(b=>b.onclick=()=>{const m=pics[+b.dataset.i];
+    $("dlgImg").src=m.photo; $("dlgText").textContent=m.text; $("dlg").showModal();});
+}
+$("dlg").onclick=()=>$("dlg").close();
+function render(){ renderPulse(); renderChips(); renderGallery(); renderFeed(); }
+$("src").onchange=e=>{state.src=e.target.value;render();};
+$("area").onchange=e=>{state.area=e.target.value;render();};
+$("q").oninput=e=>{state.q=e.target.value;render();};
+
+function setStatus(live,text){ $("dot").className="dot"+(live?" live":""); $("statusText").textContent=text; }
+
+// ===== ข้อมูลจำลองสำหรับ demo =====
+function mock(){
+  const S=[
+    ["ไฟดับอีกแล้ว ซอยลาดกระบัง 54 ดับมาชั่วโมงนึงแล้ว","outage","ลาดกระบัง","facebook","comment"],
+    ["หัวตะเข้ไฟตกทั้งคืน แอร์ตัดตลอด","outage","หัวตะเข้","traffy","report"],
+    ["หม้อแปลงหน้าเคหะร่มเกล้ามีเสียงดังแปลกๆ ควันออกด้วย","hazard","เคหะร่มเกล้า","facebook","post"],
+    ["สายไฟห้อยต่ำมาก ถนนฉลองกรุง รถบรรทุกเกี่ยวแน่","hazard","ฉลองกรุง","traffy","report"],
+    ["ขอบคุณ กฟน. ลาดกระบัง มาแก้ไวมาก ไฟมาแล้วครับ","praise","ลาดกระบัง","facebook","comment"],
+    ["ค่าไฟเดือนนี้ขึ้นเยอะผิดปกติ มิเตอร์เสียหรือเปล่า","service","ลำปลาทิว","facebook","comment"],
+    ["ไฟกระพริบทั้งซอย คลองสองต้นนุ่น เป็นทุกวันช่วงเย็น","outage","คลองสองต้นนุ่น","traffy","report"],
+    ["โทร 1130 ไม่ติดเลย แจ้งไฟดับไม่ได้","service","ทับยาว","facebook","comment"],
+    ["เสาไฟเอียงหลังพายุ แถวสุวรรณภูมิ ฝากดูด้วยครับ","hazard","สุวรรณภูมิ","facebook","post"],
+    ["คลิปไฟดับทั้งนิคมลาดกระบัง โรงงานหยุดผลิต","outage","นิคมลาดกระบัง","traffy","report"],
+    ["เจ้าหน้าที่บริการดี อธิบายละเอียด ประทับใจ","praise","ร่มเกล้า","facebook","comment"],
+    ["แถว สจล ไฟดับตอนตี 2 ใครเป็นบ้าง","outage","สจล","traffy","report"],
+    ["ขอติดตั้งมิเตอร์ใหม่รอนานเกือบเดือน","service","ขุมทอง","facebook","comment"],
+    ["ประกายไฟที่เสาหน้าตลาดหัวตะเข้ อันตรายมาก","hazard","หัวตะเข้","traffy","report"],
+    ["การไฟฟ้ามาตัดต้นไม้ใกล้สายไฟวันนี้ ดีครับ","general","คลองสามประเวศ","facebook","comment"],
+    ["ไฟไม่มาตั้งแต่เช้า อ่อนนุช 46","outage","อ่อนนุช","facebook","comment"]
+  ];
+  const out=[]; const now=Date.now();
+  for(let r=0;r<3;r++) S.forEach((s,i)=>{
+    const hrs=((i*13+r*41)%160)+(r===0&&i<3?-i*0.5:0)+0.3;
+    out.push({id:`m${r}_${i}`,text:s[0],category:s[1],area:s[2],platform:s[3],kind:s[4],
+      publishedAt:new Date(now-hrs*3600e3).toISOString(),url:"",mock:true});
+  });
+  return out;
+}
+
+async function traffyLive(){
+  try{
+    const d=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+    const ctl=new AbortController(); setTimeout(()=>ctl.abort(),15000);
+    const r=await fetch(`https://publicapi.traffy.in.th/share/teamchadchart/search?limit=1000&last_activity_start=${d}`,{signal:ctl.signal});
+    const j=await r.json();
+    return (j.results||j.data||[]).filter(t=>{
+      const types=[].concat(t.problem_type_abdul||[],t.type||[],t.problem_type||[]).join(" ").replace(/[{}",]/g," ").trim(), desc=String(t.description||"");
+      const STRONG=/ไฟดับ|ไฟฟ้าดับ|ไฟตก|หม้อแปลง\S{0,6}(ระเบิด|ไฟไหม้|ควัน|ดัง|รั่ว|ชำรุด|เอียง|ล้ม)|ลัดวงจร|สายไฟ(ขาด|ห้อย|หย่อน|พาด|ช็อต)|ไฟช็อต|ประกายไฟ|เสาไฟฟ้า(ล้ม|เอียง|หัก)/;
+      const ROAD=/ถนน.{0,20}(ชำรุด|หลุม|ทรุด)|หลุมบ่อ|ยางมะตอย|ผิวจราจร|ทางเท้า|ฟุตบาท|ท่อระบายน้ำ|น้ำท่วม|ขยะ/;
+      const dT=desc.replace(/(บริเวณ|หน้า|ใกล้|ข้าง|ตรง|ถัดจาก|ติด)\s*(เสา)?(หม้อแปลง|เสาไฟฟ้า|เสาไฟ)(ไฟฟ้า)?(\s*ต้นที่\s*\S+)?/g," ");
+      if(ROAD.test(desc)&&!STRONG.test(dT)&&!/สายไฟ/.test(types)) return false;
+      return /ลาดกระบัง/.test(String(t.district||"")+(t.address||"")) && (/สายไฟ|ไฟฟ้า/.test(types)||STRONG.test(dT));
+    }).map(t=>{
+      const types=[].concat(t.problem_type_abdul||[],t.type||[],t.problem_type||[]).join(" ").replace(/[{}",]/g," ").trim(), desc=String(t.description||"");
+      const pu=String(t.photo_url||"");
+      const bad=!pu||pu.includes("da2125e781282589d482070c3dba1726aa16a4a7");
+      const ph=(bad?String(t.after_photo||""):pu).replace(/^http:/,"https:");
+      const clean=desc.replace(/^ปัญหา:\s*/,"").replace(/\s*#1555\s*$/,"");
+      return {id:"traffy_"+t.ticket_id,platform:"traffy",kind:"report",text:(types?`[${types}] `:"")+clean,
+        category:/ไฟดับ|ไฟฟ้าดับ|ไฟตก/.test(types+desc)?"outage":"hazard",area:"ลาดกระบัง",photo:ph,state:t.state||"",
+        publishedAt:new Date(t.timestamp||t.last_activity).toISOString(),url:t.ticket_id?`https://share.traffy.in.th/teamchadchart/${t.ticket_id}`:""};
+    });
+  }catch(e){ return []; }
+}
+
+async function start(){
+  if(!FIREBASE_CONFIG){
+    state.items=mock(); renderAreas(); render(); setStatus(false,"ข้อมูลจำลอง (demo)");
+    const real=await traffyLive(); // ลองดึงรูปจริงจาก Traffy ตรงจากเบราว์เซอร์ (ถ้าเซิร์ฟเวอร์อนุญาต)
+    if(real.length){ state.items=real.concat(state.items); renderAreas(); render(); setStatus(false,`ข้อมูลจำลอง + Traffy จริง ${real.length} รายการ`); }
+    return;
+  }
+  try{
+    const {initializeApp}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    const fs=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const db=fs.getFirestore(initializeApp(FIREBASE_CONFIG));
+    const q=fs.query(fs.collection(db,COLLECTION),fs.orderBy("publishedAt","desc"),fs.limit(500));
+    fs.onSnapshot(q,snap=>{
+      state.items=snap.docs.map(d=>({id:d.id,...d.data()}));
+      renderAreas(); render();
+      setStatus(true,`ข้อมูลจริง อัปเดต ${new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})} น.`);
+    },err=>{ setStatus(false,"เชื่อม Firestore ไม่ได้: "+err.code+" ตรวจ Security Rules ให้อ่าน "+COLLECTION+" ได้"); });
+  }catch(e){ setStatus(false,"โหลด Firebase ไม่สำเร็จ ตรวจ FIREBASE_CONFIG"); }
+}
+start();
+</script>
+</body>
+</html>
