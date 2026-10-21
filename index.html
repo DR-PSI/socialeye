@@ -63,6 +63,8 @@ input[type=search]{flex:1;min-width:160px}
 .meta{font-size:.8rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px}
 .meta a{color:var(--service)}
 .tag{font-weight:600}
+.mocktoggle{display:flex;align-items:center;gap:6px;margin-left:8px;cursor:pointer}
+.mocktoggle input{accent-color:var(--outage)}
 .mock{border:1px dashed var(--muted);border-radius:6px;padding:0 6px;font-size:.72rem}
 .empty{color:var(--muted);padding:24px 0;text-align:center}
 .note{font-size:.85rem;color:var(--muted);border-left:3px solid var(--outage);padding-left:10px;margin:12px 0 0}
@@ -91,7 +93,8 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 <div class="wrap">
   <header>
     <h1>SocialEye ลาดกระบัง<small>เสียงประชาชนเรื่องไฟฟ้าในเขตลาดกระบัง จากโซเชียลมีเดีย</small></h1>
-    <div class="status"><span class="dot" id="dot"></span><span id="statusText">กำลังโหลด…</span></div>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">กำลังโหลด…</span>
+      <label class="mocktoggle" id="mockWrap" hidden><input type="checkbox" id="mockToggle"> แสดงข้อมูลตัวอย่าง</label></div>
   </header>
 
   <section aria-labelledby="pulseTitle">
@@ -136,7 +139,14 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 
 <script type="module">
 // ===== ตั้งค่า: วาง Firebase config ตรงนี้เพื่อเปลี่ยนจากข้อมูลจำลองเป็นข้อมูลจริง =====
-const FIREBASE_CONFIG = null; // ตัวอย่าง: { apiKey:"...", authDomain:"...", projectId:"..." }
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCAjbkL1gPACvPrxNwxTKpk72UedhtC-Bo",
+  authDomain: "inspection-asset.firebaseapp.com",
+  projectId: "inspection-asset",
+  storageBucket: "inspection-asset.firebasestorage.app",
+  messagingSenderId: "749137941986",
+  appId: "1:749137941986:web:8d9685658a9ac6391b55bb"
+};
 const COLLECTION = "social_mentions";
 
 const CAT = {
@@ -352,10 +362,13 @@ async function start(){
     const fs=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     const db=fs.getFirestore(initializeApp(FIREBASE_CONFIG));
     const q=fs.query(fs.collection(db,COLLECTION),fs.orderBy("publishedAt","desc"),fs.limit(500));
+    let live=[]; const MOCK=mock();
+    const apply=()=>{ state.items=$("mockToggle").checked?live.concat(MOCK):live; renderAreas(); render(); };
+    $("mockWrap").hidden=false; $("mockToggle").onchange=apply;
     fs.onSnapshot(q,snap=>{
-      state.items=snap.docs.map(d=>({id:d.id,...d.data()}));
-      renderAreas(); render();
-      setStatus(true,`ข้อมูลจริง อัปเดต ${new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})} น.`);
+      live=snap.docs.map(d=>({id:d.id,...d.data()}));
+      apply();
+      setStatus(true,`ข้อมูลจริง ${live.length} รายการ · อัปเดต ${new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})} น.`);
     },err=>{ setStatus(false,"เชื่อม Firestore ไม่ได้: "+err.code+" ตรวจ Security Rules ให้อ่าน "+COLLECTION+" ได้"); });
   }catch(e){ setStatus(false,"โหลด Firebase ไม่สำเร็จ ตรวจ FIREBASE_CONFIG"); }
 }
